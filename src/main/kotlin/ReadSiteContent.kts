@@ -162,16 +162,6 @@ fun parseContentPosts(url: String, incomingMap: MutableMap<String, String>? = nu
         }
         count--
     }
-
-    /*
-    var countNow:Int = 100
-    if (entriesMap != null) {
-        for((key, value) in entriesMap){
-            File("C:\\Users\\ HARRY\\Desktop\\TestingFiles\\To\\${++countNow}.html").printWriter().use { out ->
-                out.println(value)
-            }
-        }
-    }*/
 }
 
 fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = null){
@@ -233,16 +223,6 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
             }
         }
     }
-
-    /*
-    var countNow:Int = 100
-    if (entriesMap != null) {
-        for((key, value) in entriesMap){
-            File("C:\\Users\\ HARRY\\Desktop\\TestingFiles\\To\\${++countNow}.html").printWriter().use { out ->
-                out.println(value)
-            }
-        }
-    }*/
 }
 
 fun areRelated(firstString: String, secondString: String) = StringUtils.getLevenshteinDistance(firstString, secondString)
