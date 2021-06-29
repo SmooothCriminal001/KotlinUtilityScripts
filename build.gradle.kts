@@ -23,6 +23,7 @@ dependencies {
     implementation ("com.fasterxml:aalto-xml:1.0.0")
     implementation ("org.apache.poi:poi-scratchpad:3.8-beta3")
     implementation("org.jsoup:jsoup:1.13.1")
+    implementation("org.apache.commons:commons-lang3:3.6")
 
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.3.1")
     testImplementation("io.mockk:mockk:1.9")
