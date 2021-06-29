@@ -45,7 +45,7 @@ fun parseContent(url: String, author: String){
         println("nextPage : $nextPage")
 
         if(nextPage != null && nextPage.isNotBlank()){
-            currentUrl = "https://xossipy.com/$nextPage"
+            currentUrl = "/$nextPage"
             Thread.sleep(2000)
         }
         else{
@@ -85,7 +85,7 @@ fun parseContentPlainAuthor(url: String, author: String){
         println("nextPage : $nextPage")
 
         if(nextPage != null && nextPage.isNotBlank()){
-            currentUrl = "https://xossipy.com/$nextPage"
+            currentUrl = "$nextPage"
             Thread.sleep(2000)
         }
         else{
@@ -145,7 +145,7 @@ fun parseContentPosts(url: String, incomingMap: MutableMap<String, String>? = nu
             entriesMap = mutableMapOf(postTitle to currentPath)
         }
         else{
-            var matchedEntries= entriesMap.keys?.filter{ areRelated(it, postTitle!!) < 5}
+            var matchedEntries= entriesMap.keys?.filter{ areRelated(it, postTitle!!)}
             var matchedKey: String? = null
 
             if(!matchedEntries.isEmpty()){
@@ -207,7 +207,7 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
             entriesMap = mutableMapOf(postTitle as String to currentPath)
         }
         else{
-            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!) < 5}
+            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!)}
             var matchedKey: String? = null
 
             if(!matchedEntries.isEmpty()){
@@ -225,7 +225,43 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
     }
 }
 
-fun areRelated(firstString: String, secondString: String) = StringUtils.getLevenshteinDistance(firstString, secondString)
+fun areRelated(firstString: String, secondString: String): Boolean{
+
+    /*val distance = StringUtils.getLevenshteinDistance(firstString, secondString)
+    //println("distance $distance")
+    //println("length ${firstString.length}")
+    val threshold = (firstString.length * 0.75).toInt()
+    //println("threshold $threshold")
+
+    return distance < threshold*/
+
+    var referLenth = (firstString.length * 0.25).toInt()
+    var firstCut:String = ""
+    var secondCut: String = ""
+
+    if(secondString.length >= referLenth){
+        firstCut = firstString.trim().substring(0, referLenth)
+        secondCut = secondString.trim().substring(0, referLenth)
+
+        if(firstCut == secondCut){
+            return true
+        }
+        else{
+            firstCut = firstString.trim().substring(firstString.length - referLenth)
+            secondCut = secondString.trim().substring(secondString.length - referLenth)
+
+            if(firstCut == secondCut){
+                return true
+            }
+            else{
+                return (StringUtils.getLevenshteinDistance(firstString, secondString) < 7)
+            }
+        }
+    }
+    else{
+        return false
+    }
+}
 
 fun appendToFile(path: String, content: String) = File(path).appendText(content)
 
@@ -280,7 +316,7 @@ fun parseContent2(url: String, incomingMap: MutableMap<String, String>? = null){
             entriesMap = mutableMapOf(postTitle as String to currentPath)
         }
         else{
-            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!) < 5}
+            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!)}
             var matchedKey: String? = null
 
             if(!matchedEntries.isEmpty()){
@@ -332,7 +368,7 @@ fun parseContent2PreList(urlList:List<String>, incomingMap: MutableMap<String, S
             entriesMap = mutableMapOf(postTitle as String to currentPath)
         }
         else{
-            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!) < 5}
+            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!)}
             var matchedKey: String? = null
 
             if(!matchedEntries.isEmpty()){
@@ -347,5 +383,96 @@ fun parseContent2PreList(urlList:List<String>, incomingMap: MutableMap<String, S
                 entriesMap!!.put(postTitle!!,currentPath)
             }
         }
+    }
+}
+
+data class Content(
+    val title: String,
+    val url: String,
+    val repeats: Int,
+    val overToNew: Boolean
+)
+
+fun parseContentBlog(incomingItems: List<Content>){
+
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
+    var currentLink: String? = ""
+    var currentPath: String? = ""
+    var count: Int = 0
+
+    for(content in incomingItems){
+        currentLink = content.url
+        currentPath = baseFolder + content.title + ".html"
+        createAndWriteFile(currentPath!!, "")
+        count = 1
+
+        while(currentLink != null && count <= content.repeats){
+            println(currentLink)
+
+            val document: Document = Jsoup.connect(currentLink).get()
+
+            val postTitle = content.title + if(content.repeats == 1) "" else " $count"
+            count++
+
+            println(postTitle)
+
+            var postContent = document.select("div[class^=post-body entry-content]")?.first()?.html()
+            if(postContent == null){
+                println("skipped ${currentLink}")
+                continue
+            }
+
+            //val linkDirection = if(content.overToNew) "a[class=blog-pager-newer-link]" else "a[class=blog-pager-older-link]"
+            currentLink = document.select("a[class=blog-pager-newer-link]").first().attr("href")
+
+            println("next : $currentLink")
+            postContent = "<br/><br/><center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
+
+            appendToFile(currentPath!!, postContent!!)
+            Thread.sleep(2000)
+        }
+
+    }
+}
+
+fun parseContent3(incomingItems: List<Content>){
+
+    val baseFolder: String = ""
+    var currentLink: String? = ""
+    var currentPath: String? = ""
+    var count: Int = 0
+
+    for(content in incomingItems){
+        currentLink = content.url
+        currentPath = baseFolder + content.title + ".html"
+        createAndWriteFile(currentPath!!, "")
+        count = 1
+
+        while(currentLink != null && count <= content.repeats){
+            println(currentLink)
+
+            val document: Document = Jsoup.connect(currentLink).get()
+
+            val postTitle = content.title + if(content.repeats == 1) "" else " $count"
+            count++
+
+            println(postTitle)
+
+            var postContent = document.select("div[class^=td-post-content]")?.first()?.html()
+            if(postContent == null){
+                println("skipped ${currentLink}")
+                continue
+            }
+
+            //val linkDirection = if(content.overToNew) "a[class=blog-pager-newer-link]" else "a[class=blog-pager-older-link]"
+            currentLink = document.select("div[class=td-block-span6 td-post-next-post] > div > a").first().attr("href")
+
+            println("next : $currentLink")
+            postContent = "<br/><br/><center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
+
+            appendToFile(currentPath!!, postContent!!)
+            Thread.sleep(2000)
+        }
+
     }
 }
