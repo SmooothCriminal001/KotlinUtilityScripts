@@ -20,7 +20,7 @@ fun showContent(url:String){
     }
 }
 
-fun parseContent(url: String, author: String){
+fun parseContent(url: String, author: String, fileName: String){
 
     var currentUrl: String? = url
     var overallString: String? = ""
@@ -45,8 +45,8 @@ fun parseContent(url: String, author: String){
         println("nextPage : $nextPage")
 
         if(nextPage != null && nextPage.isNotBlank()){
-            currentUrl = "/$nextPage"
-            Thread.sleep(2000)
+            currentUrl = "https://xossipy.com/$nextPage"
+            Thread.sleep(500)
         }
         else{
             currentUrl = null
@@ -55,7 +55,7 @@ fun parseContent(url: String, author: String){
 
     }
 
-    File("").printWriter().use { out ->
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$fileName.html").printWriter().use { out ->
         out.println(overallString)
     }
 }
@@ -106,7 +106,7 @@ fun parseContentPosts(url: String, incomingMap: MutableMap<String, String>? = nu
     var currentLink:String? = url
 
     var overallString:String? = ""
-    val baseFolder: String = ""
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
     var currentPath: String = ""
 
     var entriesMap = incomingMap
@@ -164,12 +164,13 @@ fun parseContentPosts(url: String, incomingMap: MutableMap<String, String>? = nu
     }
 }
 
+parseContentBlog("https://thirumbudi.blogspot.com/2021/09/1527.html")
 fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = null){
 
     var currentLink:String? = url
 
     var overallString:String? = ""
-    val baseFolder: String = ""
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
     var currentPath: String = ""
 
     var entriesMap = incomingMap
@@ -186,14 +187,76 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
             postTitle = "No Title"
         }
 
+        println(postTitle)
+        //currentLink = document.select("a[class=blog-pager-older-link]").first().attr("href")
+        currentLink = document.select("a[class=blog-pager-newer-link]")?.first()?.attr("href")
+
+        println("next : $currentLink")
+
         if(postContent == null){
             println("skipped ${currentLink}")
             continue
         }
 
+        postContent = "<br/><br/><center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
+        //overallString = overallString + "<center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
+
+        //println(entriesMap)
+        currentPath = baseFolder + postTitle + ".html"
+
+        if(entriesMap == null){
+            createAndWriteFile(currentPath, postContent!!)
+            entriesMap = mutableMapOf(postTitle as String to currentPath)
+        }
+        else{
+            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!)}
+            var matchedKey: String? = null
+
+            if(!matchedEntries.isEmpty()){
+                matchedKey = matchedEntries.first()
+            }
+
+            if(matchedKey != null){
+                appendToFile(entriesMap!!.get(matchedKey) as String, postContent!!)
+            }
+            else{
+                createAndWriteFile(currentPath, postContent!!)
+                entriesMap!!.put(postTitle!!,currentPath)
+            }
+        }
+    }
+}
+
+fun parseContentBlogSpecial(url: String, incomingMap: MutableMap<String, String>? = null, excludePhrase: String){
+
+    var currentLink:String? = url
+
+    var overallString:String? = ""
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
+    var currentPath: String = ""
+
+    var entriesMap = incomingMap
+
+    while(currentLink != null){
+
+        println(currentLink)
+        val document: Document = Jsoup.connect(currentLink).get()
+
+        var postTitle = document.select("h3[class=post-title entry-title]")?.first()?.html()?.replace("[/\\:*?\"<>|]".toRegex(), "")
+        var postContent = document.select("div[class^=post-body entry-content]")?.first()?.html()
+
+        if(postTitle == null){
+            postTitle = "No Title"
+        }
+
         println(postTitle)
         //currentLink = document.select("a[class=blog-pager-older-link]").first().attr("href")
         currentLink = document.select("a[class=blog-pager-newer-link]")?.first()?.attr("href")
+
+        if(postContent == null || postContent!!.contains(excludePhrase)){
+            println("skipped ${currentLink}")
+            continue
+        }
 
         println("next : $currentLink")
         postContent = "<br/><br/><center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
@@ -239,7 +302,7 @@ fun areRelated(firstString: String, secondString: String): Boolean{
     var firstCut:String = ""
     var secondCut: String = ""
 
-    if(secondString.length >= referLenth){
+    if(secondString.trim().length >= referLenth){
         firstCut = firstString.trim().substring(0, referLenth)
         secondCut = secondString.trim().substring(0, referLenth)
 
@@ -270,7 +333,7 @@ fun createAndWriteFile(path: String, content:String) = File(path).printWriter().
 fun parseContent2(url: String, incomingMap: MutableMap<String, String>? = null){
     var currentLink:String? = url
     var overallString:String? = ""
-    val baseFolder: String = ""
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
     var currentPath: String = ""
 
     var entriesMap = incomingMap
@@ -475,4 +538,111 @@ fun parseContent3(incomingItems: List<Content>){
         }
 
     }
+}
+
+fun parsePageLists(url: String, repeatThread : String? = null) {
+
+    var afterThread = repeatThread
+    val baseUrl = ""
+    var nextPageUrl: String? = url
+    val allEntries: MutableMap<String, String> = mutableMapOf()
+
+    while (nextPageUrl != null) {
+        val document: Document = Jsoup.connect(nextPageUrl).get()
+
+        var includeTr = false
+        val consideredElements: MutableList<Element> = mutableListOf()
+
+        document.select("tr").forEach {
+            if (afterThread == null && it.select("td").first().text() == "Normal Threads" && !includeTr) {
+                includeTr = true
+            }
+            else if(afterThread != null && !includeTr){
+                includeTr = it.select("a").any { it.attr("href").contains(afterThread!!) }
+            }
+            else if (includeTr && it.attr("class") == "inline_row") {
+                consideredElements.add(it)
+            }
+        }
+
+        consideredElements.forEach {
+            val allAs = it.select("a[href^=thread-]").filter {
+                !it.attr("href").contains("-newpost") && !it.attr("href").contains("-lastpost")
+            }
+
+            val threadUrl = allAs.first().attr("href")
+            val title = allAs.first().text().replace("[/\\:*?\"<>|]".toRegex(), "")
+            val threadName = threadUrl.substringBefore(".")
+            val url = baseUrl + threadUrl
+
+            val maxPageElement = allAs.filter {
+                it.attr("href").startsWith("$threadName-page")
+            }
+
+            if(!maxPageElement.isEmpty()){
+                val maxPages = maxPageElement.last().text()?.trim()?.toInt()
+
+                if (maxPages != null && maxPages >= 10) {
+                    val author = it.select("div[class=author smalltext]").text()
+
+                    parseContentAllAuthor(url, author, title)
+                }
+            }
+        }
+
+        val nextPage = document.select("a[class=pagination_next]")?.attr("href");
+
+        print("$nextPage : ")
+        if (nextPage != null && nextPage.isNotBlank()) {
+            afterThread = null
+            nextPageUrl = baseUrl + nextPage
+            println("NEXT LIST PAGE $nextPageUrl")
+        } else {
+            println("whole thing ends")
+            nextPageUrl = null
+        }
+
+        Thread.sleep(2000)
+    }
+}
+
+
+fun parseContentAllAuthor(url: String, author: String, title: String){
+
+    var currentUrl: String? = url
+    var overallString: String? = ""
+    val baseUrl = ""
+
+    while(currentUrl != null && currentUrl!!.isNotBlank()){
+        val document: Document = Jsoup.connect(currentUrl).get()
+        val postContent: Elements = document.select("div[class=post]")
+
+        var currentString:String? = ""
+
+        postContent.filter {
+            it.select("div.post_author > div.author_information > strong > span > a")?.text() == author ||
+            it.select("div.post_author > div.author_information > strong > span")?.text() == author
+        }.forEach {
+            currentString = it.select("div.post_content > div.post_body")?.html()
+
+            if(currentString != null && (!currentString!!.contains("blockquote"))){
+                overallString += "<br/><br/>" + currentString
+            }
+        }
+
+        val nextPage = document.select("div[class=pagination] > a[class=pagination_next]")?.attr("href")
+        println("nextPage : $nextPage")
+
+        if(nextPage != null && nextPage.isNotBlank()){
+            currentUrl = "$baseUrl$nextPage"
+            Thread.sleep(500)
+        }
+        else{
+            currentUrl = null
+        }
+
+    }
+
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
+    createAndWriteFile(baseFolder + title + ".html", overallString as String)
 }
