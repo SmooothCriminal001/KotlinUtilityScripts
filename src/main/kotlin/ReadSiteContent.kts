@@ -1,12 +1,13 @@
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.mutable.Mutable
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
+import java.io.BufferedReader
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-
 
 fun showContent(url:String){
     val url = URL(url)
@@ -20,12 +21,13 @@ fun showContent(url:String){
     }
 }
 
-fun parseContent(url: String, author: String, fileName: String){
+fun parseContent(url: String, author: String, fileName: String, baseUrl: String){
 
     var currentUrl: String? = url
     var overallString: String? = ""
 
-    while(currentUrl != null && currentUrl.isNotBlank()){
+    var count = 0
+    while(currentUrl != null && currentUrl.isNotBlank() && count<=200){
         val document: Document = Jsoup.connect(currentUrl).get()
         val postContent: Elements = document.select("div[class=post]")
 
@@ -45,14 +47,14 @@ fun parseContent(url: String, author: String, fileName: String){
         println("nextPage : $nextPage")
 
         if(nextPage != null && nextPage.isNotBlank()){
-            currentUrl = "https://xossipy.com/$nextPage"
+            currentUrl = baseUrl + nextPage
             Thread.sleep(500)
         }
         else{
             currentUrl = null
         }
         println("currentUrl : $currentUrl")
-
+        count++
     }
 
     File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$fileName.html").printWriter().use { out ->
@@ -60,7 +62,7 @@ fun parseContent(url: String, author: String, fileName: String){
     }
 }
 
-fun parseContentPlainAuthor(url: String, author: String){
+fun parseContentPlainAuthor(url: String, author: String, fileName: String){
 
     var currentUrl: String? = url
     var overallString: String? = ""
@@ -85,8 +87,8 @@ fun parseContentPlainAuthor(url: String, author: String){
         println("nextPage : $nextPage")
 
         if(nextPage != null && nextPage.isNotBlank()){
-            currentUrl = "$nextPage"
-            Thread.sleep(2000)
+            currentUrl = nextPage
+            Thread.sleep(500)
         }
         else{
             currentUrl = null
@@ -95,7 +97,7 @@ fun parseContentPlainAuthor(url: String, author: String){
 
     }
 
-    File("").printWriter().use { out ->
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$fileName.html").printWriter().use { out ->
         out.println(overallString)
     }
 }
@@ -164,14 +166,14 @@ fun parseContentPosts(url: String, incomingMap: MutableMap<String, String>? = nu
     }
 }
 
-parseContentBlog("https://thirumbudi.blogspot.com/2021/09/1527.html")
-fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = null){
+fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = null, quarterSimilarty: Boolean = true, onlyLevenshtein: Boolean = false){
 
     var currentLink:String? = url
 
-    var overallString:String? = ""
     val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
     var currentPath: String = ""
+
+    var finalString = "<table border=\"1\">"
 
     var entriesMap = incomingMap
 
@@ -187,11 +189,16 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
             postTitle = "No Title"
         }
 
+        finalString += "<tr><td>$postTitle</td><td>$currentLink</td></tr>"
+
         println(postTitle)
+
+
         //currentLink = document.select("a[class=blog-pager-older-link]").first().attr("href")
         currentLink = document.select("a[class=blog-pager-newer-link]")?.first()?.attr("href")
 
         println("next : $currentLink")
+
 
         if(postContent == null){
             println("skipped ${currentLink}")
@@ -201,7 +208,7 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
         postContent = "<br/><br/><center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
         //overallString = overallString + "<center><h2 class=\"chapter\">$postTitle</h2></center>$postContent"
 
-        //println(entriesMap)
+        println(entriesMap)
         currentPath = baseFolder + postTitle + ".html"
 
         if(entriesMap == null){
@@ -209,7 +216,7 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
             entriesMap = mutableMapOf(postTitle as String to currentPath)
         }
         else{
-            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!)}
+            var matchedEntries= entriesMap!!.keys?.filter{ areRelated(it, postTitle!!, quarterSimilarty, onlyLevenshtein=onlyLevenshtein)}
             var matchedKey: String? = null
 
             if(!matchedEntries.isEmpty()){
@@ -288,7 +295,7 @@ fun parseContentBlogSpecial(url: String, incomingMap: MutableMap<String, String>
     }
 }
 
-fun areRelated(firstString: String, secondString: String): Boolean{
+fun areRelated(firstString: String, secondString: String, quarterSimilarty: Boolean = true, onlyLevenshtein: Boolean = false): Boolean{
 
     /*val distance = StringUtils.getLevenshteinDistance(firstString, secondString)
     //println("distance $distance")
@@ -298,32 +305,41 @@ fun areRelated(firstString: String, secondString: String): Boolean{
 
     return distance < threshold*/
 
-    var referLenth = (firstString.length * 0.25).toInt()
-    var firstCut:String = ""
-    var secondCut: String = ""
+    if(onlyLevenshtein){
+        return (StringUtils.getLevenshteinDistance(firstString, secondString) < 5)
+    }
+    else{
+        val similarityExtent = if(quarterSimilarty) 0.25 else 0.5
 
-    if(secondString.trim().length >= referLenth){
-        firstCut = firstString.trim().substring(0, referLenth)
-        secondCut = secondString.trim().substring(0, referLenth)
+        var referLenth = (firstString.length * similarityExtent).toInt()
+        //var referLenth = (firstString.length * 0.5).toInt()
+        var firstCut:String = ""
+        var secondCut: String = ""
 
-        if(firstCut == secondCut){
-            return true
-        }
-        else{
-            firstCut = firstString.trim().substring(firstString.length - referLenth)
-            secondCut = secondString.trim().substring(secondString.length - referLenth)
+        if(secondString.trim().length >= referLenth){
+            firstCut = firstString.trim().substring(0, referLenth)
+            secondCut = secondString.trim().substring(0, referLenth)
 
             if(firstCut == secondCut){
                 return true
             }
             else{
-                return (StringUtils.getLevenshteinDistance(firstString, secondString) < 7)
+                firstCut = firstString.trim().substring(firstString.length - referLenth)
+                secondCut = secondString.trim().substring(secondString.length - referLenth)
+
+                if(firstCut == secondCut){
+                    return true
+                }
+                else{
+                    return (StringUtils.getLevenshteinDistance(firstString, secondString) < 7)
+                }
             }
         }
+        else{
+            return false
+        }
     }
-    else{
-        return false
-    }
+
 }
 
 fun appendToFile(path: String, content: String) = File(path).appendText(content)
@@ -540,10 +556,9 @@ fun parseContent3(incomingItems: List<Content>){
     }
 }
 
-fun parsePageLists(url: String, repeatThread : String? = null) {
+fun parsePageLists(url: String, repeatThread : String? = null, baseUrl: String = "") {
 
     var afterThread = repeatThread
-    val baseUrl = ""
     var nextPageUrl: String? = url
     val allEntries: MutableMap<String, String> = mutableMapOf()
 
@@ -582,11 +597,15 @@ fun parsePageLists(url: String, repeatThread : String? = null) {
             if(!maxPageElement.isEmpty()){
                 val maxPages = maxPageElement.last().text()?.trim()?.toInt()
 
+
+
                 if (maxPages != null && maxPages >= 10) {
                     val author = it.select("div[class=author smalltext]").text()
 
-                    parseContentAllAuthor(url, author, title)
+                    //completeString += "<tr><td>$title</td><td>$author</td><td>$url</td><td>$maxPages</td></tr>"
+                    parseContentAllAuthor(url, author, title, baseUrl)
                 }
+
             }
         }
 
@@ -595,23 +614,19 @@ fun parsePageLists(url: String, repeatThread : String? = null) {
         print("$nextPage : ")
         if (nextPage != null && nextPage.isNotBlank()) {
             afterThread = null
-            nextPageUrl = baseUrl + nextPage
-            println("NEXT LIST PAGE $nextPageUrl")
+            nextPageUrl = (baseUrl + nextPage).trim()
+            println("NEXT LIST PAGE $nextPage")
         } else {
             println("whole thing ends")
             nextPageUrl = null
         }
-
-        Thread.sleep(2000)
     }
 }
 
-
-fun parseContentAllAuthor(url: String, author: String, title: String){
+fun parseContentAllAuthor(url: String, author: String, title: String, baseUrl: String){
 
     var currentUrl: String? = url
     var overallString: String? = ""
-    val baseUrl = ""
 
     while(currentUrl != null && currentUrl!!.isNotBlank()){
         val document: Document = Jsoup.connect(currentUrl).get()
@@ -635,7 +650,6 @@ fun parseContentAllAuthor(url: String, author: String, title: String){
 
         if(nextPage != null && nextPage.isNotBlank()){
             currentUrl = "$baseUrl$nextPage"
-            Thread.sleep(500)
         }
         else{
             currentUrl = null
@@ -645,4 +659,129 @@ fun parseContentAllAuthor(url: String, author: String, title: String){
 
     val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
     createAndWriteFile(baseFolder + title + ".html", overallString as String)
+}
+
+fun parseSeries(seriesUrl: String){
+    var currentUrl:String? = seriesUrl
+    val linksList: MutableList<String> = mutableListOf()
+    var title = ""
+
+    while(!currentUrl.isNullOrEmpty()){
+        var document: Document = Jsoup.connect(currentUrl).get()
+
+        document.select("h2[class=entry-title]").forEach {
+            linksList.add(it.select("a").attr("href"))
+        }
+
+        title = document.select("h1[class=page-title] > span")?.text() ?: "NoTitle"
+
+        currentUrl = document.select("a[class=next page-numbers]")?.attr("href")
+    }
+
+    var overallString = ""
+    linksList.reversed().forEach {
+        println(it)
+        val entry: Document = Jsoup.connect(it).get()
+
+        entry.select("div[class=entry-content] > section").remove()
+        overallString += "<br/><br/>" + entry.select("div[class=entry-content]").html()
+    }
+
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$title.html").printWriter().use { out ->
+        out.println(overallString)
+    }
+}
+
+data class PostContent(
+    val url: String,
+    val times: Int
+)
+
+fun parseContentBlog2(incomingItems: List<PostContent>){
+    for(content in incomingItems){
+        parseContentPosts(content.url, maxTimes = content.times)
+    }
+}
+
+fun parseContentNewSinglePg(url: String){
+
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
+    val document: Document = Jsoup.connect(url).get()
+
+    var postTitle = document.select("h1[class=entry-title]")?.text()
+    var postContent = document.select("div[class=entry-content entry-content-single]")?.first()?.html()
+
+    if(postTitle == null){
+        postTitle = "No Title"
+    }
+
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$postTitle.html").printWriter().use { out ->
+        out.println(postContent)
+    }
+}
+
+fun parseFiles(){
+
+    var completeFile: String = ""
+    File("G:\\Hari\\Programming\\TempFile\\").walk()
+        .filter { it.extension == "html"}
+        .filter { pickFile(it.name.removeSuffix(".html"))}
+        .forEach {
+
+            it.delete()
+            /*
+            println(it.name)
+            completeFile += File(it.absolutePath).bufferedReader().use(BufferedReader::readText)
+
+             */
+        }
+
+    /*File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\compilation.html").printWriter().use { out ->
+        out.println(completeFile)
+    }*/
+}
+
+fun pickFile(fileName: String): Boolean{
+    val reversedName = fileName.reversed()
+    val maxLength = if(reversedName.length < 5) reversedName.length else 3
+
+    for(i in 0 until maxLength){
+        if(reversedName[i].isDigit()){
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fun parseContentW(url: String, baseUrl: String){
+    val document: Document = Jsoup.connect(url).get()
+
+    val urlsList = mutableListOf<String>()
+
+    document.select("ul[class*=table-of-contents] > li").forEach {
+        urlsList.add(baseUrl + (it.select("a[class=on-navigate]")?.attr("href") ?: throw IllegalArgumentException("Not valid url")))
+    }
+
+    val title = document.select("span[class=info] > h2[class*=title]")?.text() ?: "New Title"
+    var content = ""
+
+    urlsList.forEachIndexed { indx, sect ->
+        println(sect)
+        val eachSect: Document = Jsoup.connect(sect).get()
+
+        val sectTitle = eachSect.select("header[class=panel panel-reading text-center] > h1[class=h2]")?.text() ?: indx
+        content += "<br/><br/><center><h2 class=\"chapter\">$sectTitle</h2></center>"
+
+        eachSect.select("div[class$=panel panel-reading]").forEach {
+            content += it.html()
+        }
+
+        return
+    }
+
+    println(content)
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$title.html").printWriter().use { out ->
+        out.println(content)
+    }
 }
