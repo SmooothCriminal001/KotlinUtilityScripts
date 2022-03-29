@@ -1,14 +1,15 @@
+import com.itextpdf.text.pdf.PdfReader
+import com.itextpdf.text.pdf.parser.PdfTextExtractor
 import org.apache.commons.lang3.StringUtils
-import org.apache.commons.lang3.mutable.Mutable
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
-import java.io.BufferedReader
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
+//showContent("https://castbox.fm/channel/The-Knowledge-Project-with-Shane-Parrish-id1364693")
 fun showContent(url:String){
     val url = URL(url)
     val urlConnection = url.openConnection() as HttpURLConnection
@@ -667,7 +668,7 @@ fun parseSeries(seriesUrl: String){
     var title = ""
 
     while(!currentUrl.isNullOrEmpty()){
-        var document: Document = Jsoup.connect(currentUrl).get()
+        var document: Document = Jsoup.connect(currentUrl).userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6").referrer("http://www.google.com").get()
 
         document.select("h2[class=entry-title]").forEach {
             linksList.add(it.select("a").attr("href"))
@@ -681,7 +682,7 @@ fun parseSeries(seriesUrl: String){
     var overallString = ""
     linksList.reversed().forEach {
         println(it)
-        val entry: Document = Jsoup.connect(it).get()
+        val entry: Document = Jsoup.connect(it).userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6").referrer("http://www.google.com").get()
 
         entry.select("div[class=entry-content] > section").remove()
         overallString += "<br/><br/>" + entry.select("div[class=entry-content]").html()
@@ -730,7 +731,7 @@ fun parseFiles(){
 
             it.delete()
             /*
-            println(it.name)
+                println(it.name)
             completeFile += File(it.absolutePath).bufferedReader().use(BufferedReader::readText)
 
              */
@@ -783,5 +784,63 @@ fun parseContentW(url: String, baseUrl: String){
     println(content)
     File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$title.html").printWriter().use { out ->
         out.println(content)
+    }
+}
+
+fun testPDFExtract(){
+    val reader = PdfReader("G:\\Hari\\Books\\Testing.pdf")
+    var resultText = ""
+
+    for(i in 1..reader.numberOfPages){
+        resultText += PdfTextExtractor.getTextFromPage(reader, i, ) + "\n"
+    }
+
+    print("result Text : $resultText")
+
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\Testing.txt").printWriter().use { out ->
+        out.println(resultText)
+    }
+}
+
+fun parseContentFa(url: String, author: String, baseUrl: String = ""){
+
+    var currentUrl: String? = url
+    var overallString: String? = ""
+
+    var count = 0
+
+    var title: String? = null
+
+    while(currentUrl != null && currentUrl!!.isNotBlank() && count<=200){
+        val document: Document = Jsoup.connect(currentUrl).get()
+
+        if(title == null){
+            document.select("div[class=p-title ] > h1[class=p-title-value] > *").remove()
+            title = document.select("div[class=p-title ] > h1[class=p-title-value]")?.first()?.text()?.replace("[/\\:*?\"<>|]".toRegex(), "") ?: "No title"
+        }
+
+        document.select("div[class=message-inner]").forEach {
+            val authName = it.select("div[class=message-userDetails] > h4[class=message-name] > a").text()
+
+            if(authName == author){
+                overallString += it.select("div[class=bbWrapper]").first().html() + "<br/><br/>"
+            }
+        }
+
+        val nextPage = document.select("a[class*=pageNav-jump--next]")?.first()?.attr("href")
+        println("nextPage : $nextPage")
+
+        if(nextPage != null && nextPage.isNotBlank()){
+            currentUrl = baseUrl + nextPage
+        }
+        else{
+            currentUrl = null
+        }
+        println("currentUrl : $currentUrl")
+        count++
+    }
+
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$title.html").printWriter().use { out ->
+        out.println(overallString)
     }
 }

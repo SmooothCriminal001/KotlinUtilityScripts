@@ -9,6 +9,7 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
@@ -24,6 +25,10 @@ dependencies {
     implementation ("org.apache.poi:poi-scratchpad:3.8-beta3")
     implementation("org.jsoup:jsoup:1.13.1")
     implementation("org.apache.commons:commons-lang3:3.6")
+    implementation("com.itextpdf:itextpdf:5.5.0")
+    implementation("org.bouncycastle:bcprov-jdk15on:1.50")
+    implementation("org.bouncycastle:bcpkix-jdk15on:1.50")
+    implementation("com.beust:klaxon:5.5")
 
     testImplementation("io.kotlintest:kotlintest-runner-junit5:3.3.1")
     testImplementation("io.mockk:mockk:1.9")
