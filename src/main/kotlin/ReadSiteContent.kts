@@ -1,6 +1,7 @@
 import com.itextpdf.text.pdf.PdfReader
 import com.itextpdf.text.pdf.parser.PdfTextExtractor
 import org.apache.commons.lang3.StringUtils
+import org.jsoup.HttpStatusException
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -8,11 +9,18 @@ import org.jsoup.select.Elements
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.KeyManagementException
+import java.security.cert.CertificateException
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
-//showContent("https://castbox.fm/channel/The-Knowledge-Project-with-Shane-Parrish-id1364693")
 fun showContent(url:String){
     val url = URL(url)
     val urlConnection = url.openConnection() as HttpURLConnection
+    urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.4; en-US; rv:1.9.2.2) Gecko/20100316 Firefox/3.6.2")
 
     try {
         val text = urlConnection.inputStream.bufferedReader().readText()
@@ -171,7 +179,7 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
 
     var currentLink:String? = url
 
-    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\From\\"
     var currentPath: String = ""
 
     var finalString = "<table border=\"1\">"
@@ -180,7 +188,6 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
 
     while(currentLink != null){
 
-        println(currentLink)
         val document: Document = Jsoup.connect(currentLink).get()
 
         var postTitle = document.select("h3[class=post-title entry-title]")?.first()?.html()?.replace("[/\\:*?\"<>|]".toRegex(), "")
@@ -191,9 +198,6 @@ fun parseContentBlog(url: String, incomingMap: MutableMap<String, String>? = nul
         }
 
         finalString += "<tr><td>$postTitle</td><td>$currentLink</td></tr>"
-
-        println(postTitle)
-
 
         //currentLink = document.select("a[class=blog-pager-older-link]").first().attr("href")
         currentLink = document.select("a[class=blog-pager-newer-link]")?.first()?.attr("href")
@@ -591,6 +595,8 @@ fun parsePageLists(url: String, repeatThread : String? = null, baseUrl: String =
             val threadName = threadUrl.substringBefore(".")
             val url = baseUrl + threadUrl
 
+
+
             val maxPageElement = allAs.filter {
                 it.attr("href").startsWith("$threadName-page")
             }
@@ -598,9 +604,15 @@ fun parsePageLists(url: String, repeatThread : String? = null, baseUrl: String =
             if(!maxPageElement.isEmpty()){
                 val maxPages = maxPageElement.last().text()?.trim()?.toInt()
 
+                print("title $title - $maxPages")
 
+                val consent: String? = readLine()
 
-                if (maxPages != null && maxPages >= 10) {
+                if(consent!=null && consent.isNotBlank()){
+                    return@forEach
+                }
+
+                if (maxPages != null && maxPages >= 2) {
                     val author = it.select("div[class=author smalltext]").text()
 
                     //completeString += "<tr><td>$title</td><td>$author</td><td>$url</td><td>$maxPages</td></tr>"
@@ -658,11 +670,11 @@ fun parseContentAllAuthor(url: String, author: String, title: String, baseUrl: S
 
     }
 
-    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\"
+    val baseFolder: String = "C:\\Users\\ HARRY\\Desktop\\TestFiles\\From\\"
     createAndWriteFile(baseFolder + title + ".html", overallString as String)
 }
 
-fun parseSeries(seriesUrl: String){
+fun parseSeries(seriesUrl: String, maxNum: Int? = null){
     var currentUrl:String? = seriesUrl
     val linksList: MutableList<String> = mutableListOf()
     var title = ""
@@ -679,6 +691,13 @@ fun parseSeries(seriesUrl: String){
         currentUrl = document.select("a[class=next page-numbers]")?.attr("href")
     }
 
+    if(maxNum != null && linksList.size < maxNum) {
+        println("skipped $title")
+        return
+    }
+
+    title = title.replace("[/\\:*?\"<>|]".toRegex(), "")
+
     var overallString = ""
     linksList.reversed().forEach {
         println(it)
@@ -688,8 +707,111 @@ fun parseSeries(seriesUrl: String){
         overallString += "<br/><br/>" + entry.select("div[class=entry-content]").html()
     }
 
-    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\To\\$title.html").printWriter().use { out ->
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\From\\$title.html").printWriter().use { out ->
         out.println(overallString)
+    }
+}
+
+fun parseSeriesMain(url: String){
+    val document: Document = Jsoup.connect(url).userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6").referrer("http://www.google.com").get()
+    var enableProcess = false
+
+    document.select("h2[class=entry-title] > a").forEach {
+        val currentHref = it.attr("href")
+
+        if(enableProcess){
+            parseSeries(it.attr("href"), maxNum = 5)
+        }
+        else{
+            println("skipped outer$enableProcess : $currentHref")
+        }
+
+        if(currentHref == ""){
+            enableProcess = true
+        }
+    }
+}
+
+fun parseSeriesEng(seriesUrl: String){
+    var currentUrl:String? = seriesUrl
+    val linksList: MutableList<String> = mutableListOf()
+    var title = ""
+
+    while(!currentUrl.isNullOrEmpty()){
+        var document: Document = getConnection(currentUrl!!)
+
+        document.select("h2[class=post-title]").forEach {
+            linksList.add(it.select("a").attr("href"))
+        }
+
+        title = document.select("div[class=archive-title] > h1")?.text() ?: "NoTitle"
+
+        currentUrl = document.select("a[class=next page-numbers]")?.attr("href")
+    }
+
+    /*if(maxNum != null && linksList.size < maxNum) {
+        println("skipped $title")
+        return
+    }*/
+
+    title = title.replace("[/\\:*?\"<>|]".toRegex(), "")
+
+    var overallString = ""
+    linksList.reversed().forEach {
+        println(it)
+        val entry: Document = getConnection(it)
+
+        overallString += "<br/><br/><h1>${entry.select("h1[class=post-title]").text()}</h1><br/>" + entry.select("section[class=story-content]").html()
+    }
+
+    File("C:\\Users\\ HARRY\\Desktop\\TestFiles\\From\\$title.html").printWriter().use { out ->
+        out.println(overallString)
+    }
+}
+
+fun getConnection(url: String): Document{
+    lateinit var document: Document
+
+    try{
+        document = Jsoup.connect(url).userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6").referrer("http://www.google.com").get()
+    }
+    catch (e: HttpStatusException){
+        if(e.statusCode == 525){
+            println("sleeping for $url")
+            Thread.sleep(60000)
+            return getConnection(url)
+        }
+    }
+
+    return document
+}
+
+fun socketFactory(): SSLSocketFactory {
+    val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+        @Throws(CertificateException::class)
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
+        }
+
+        @Throws(CertificateException::class)
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+        }
+
+        override fun getAcceptedIssuers(): Array<X509Certificate> {
+            return arrayOf()
+        }
+    })
+
+    try {
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+        return sslContext.socketFactory
+    } catch (e: Exception) {
+        when (e) {
+            is RuntimeException, is KeyManagementException -> {
+                throw RuntimeException("Failed to create a SSL socket factory", e)
+            }
+            else -> throw e
+        }
     }
 }
 
@@ -820,7 +942,7 @@ fun parseContentFa(url: String, author: String, baseUrl: String = ""){
         }
 
         document.select("div[class=message-inner]").forEach {
-            val authName = it.select("div[class=message-userDetails] > h4[class=message-name] > a").text()
+                val authName = it.select("div[class=message-userDetails] > h4[class=message-name] > a").text()
 
             if(authName == author){
                 overallString += it.select("div[class=bbWrapper]").first().html() + "<br/><br/>"
